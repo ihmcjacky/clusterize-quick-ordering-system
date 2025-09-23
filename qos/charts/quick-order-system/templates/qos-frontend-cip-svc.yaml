@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ index .Values "qos-frontend" "service" "clusterip" "name" }}
+  labels:
+    app: {{ index .Values "qos-frontend" "service" "clusterip" "name" }}
+spec:
+  type: {{ index .Values "qos-frontend" "service" "clusterip" "type" }}
+  ports:
+  - name: http
+    protocol: TCP
+    port: {{ index .Values "qos-frontend" "service" "clusterip" "port" }}
+    targetPort: {{ index .Values "qos-frontend" "service" "clusterip" "targetPort" }}
+  selector:
+    app: qos-frontend-pod

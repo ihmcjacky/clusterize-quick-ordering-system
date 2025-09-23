@@ -1,0 +1,93 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: qos-backend-depl
+  name: qos-backend-depl
+spec:
+  replicas: {{ index .Values "qos-backend" "depl" "spec" "replicas" }}
+  selector:
+    matchLabels:
+      app: qos-backend-pod
+  template:
+    metadata:
+      labels:
+        app: qos-backend-pod
+    spec:
+      # Volume for datasources.json
+      volumes:
+      - name: qos-backend-cfg
+        configMap:
+          name: qos-backend-cfg
+          defaultMode: 0755
+          items:
+          # Mount the template file to /config-templates/datasources.json.template
+          # key in the config map
+          - key: datasources.json.template
+            path: datasources.json.template
+      - name: meal-images-assets
+        emptyDir: {}
+      # Volume for processed datasources.json
+      - name: qos-backend-datasources-json
+        emptyDir: {}
+      
+      # Init container to process datasources.json and its environment variables substitution
+      initContainers:
+      - name: qos-backend-init-processor
+        image: alpine:3.18
+        securityContext:
+          runAsUser: 0
+          runAsNonRoot: false
+        # Install gettext for envsubst and process the template
+        command: ["/bin/sh"]
+        args: ["-c", "apk add --no-cache gettext && echo 'Processing datasources.json template...' && echo 'All environment variables:' && env | sort && echo '=== DB variables ===' && env | grep -E '^DB_' && envsubst < /config-templates/datasources.json.template > /processed-datasources-json/datasources.json && echo 'Processed datasources.json:' && cat /processed-datasources-json/datasources.json"]
+        volumeMounts:
+        - name: qos-backend-cfg
+          mountPath: /config-templates
+        - name: qos-backend-datasources-json
+          mountPath: /processed-datasources-json
+        # Add environment variables for substitution
+        envFrom:
+        - configMapRef:
+            name: qos-cfg
+        - secretRef:
+            name: qos-secret
+        resources:
+          requests:
+            cpu: "10m"
+            memory: "16Mi"
+          limits:
+            cpu: "50m"
+            memory: "32Mi"
+
+      # Container for LoopbackJS
+      containers:
+      - image: {{ index .Values "qos-backend" "depl" "template" "spec" "containers" "image" }}
+        name: quick-ordering-backend
+        ports:
+        - containerPort: 3002
+          name: http
+          protocol: TCP
+        volumeMounts:
+        # Mount the processed datasources.json to the LoopbackJS app from initContainer
+        - name: qos-backend-datasources-json
+          mountPath: /usr/src/app/quick-order-system-loopback/server/datasources.json
+          # Mount the processed file from the volume instead of the directory
+          subPath: datasources.json
+        - name: meal-images-assets
+          mountPath: /usr/src/app/quick-order-system-loopback/server/assets/images
+        envFrom:
+        - configMapRef:
+            name: qos-cfg
+        - secretRef:
+            name: qos-secret
+        resources:
+          requests:
+            # 10% of 1 CPU
+            cpu: {{ index .Values "qos-backend" "depl" "template" "spec" "containers" "resources" "requests" "cpu" }}
+            # 64MB of memory
+            memory: {{ index .Values "qos-backend" "depl" "template" "spec" "containers" "resources" "requests" "memory" }}
+          limits:
+            # 20% of 1 CPU
+            cpu: {{ index .Values "qos-backend" "depl" "template" "spec" "containers" "resources" "limits" "cpu" }}
+            memory: {{ index .Values "qos-backend" "depl" "template" "spec" "containers" "resources" "limits" "memory" }}

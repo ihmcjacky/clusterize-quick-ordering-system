@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ index .Values "qos-frontend" "service" "nodeport" "name" }}
+  labels:
+    app: {{ index .Values "qos-frontend" "service" "nodeport" "name" }}
+spec:
+  type: {{ index .Values "qos-frontend" "service" "nodeport" "type" }}
+  selector:
+    app: qos-frontend-pod
+  ports:
+  - name: http
+    protocol: TCP
+    port: {{ index .Values "qos-frontend" "service" "nodeport" "ports" "http" "port" }}
+    targetPort: {{ index .Values "qos-frontend" "service" "nodeport" "ports" "http" "targetPort" }}
+  - name: https
+    protocol: TCP
+    port: {{ index .Values "qos-frontend" "service" "nodeport" "ports" "https" "port" }}
+    targetPort: {{ index .Values "qos-frontend" "service" "nodeport" "ports" "https" "targetPort" }}

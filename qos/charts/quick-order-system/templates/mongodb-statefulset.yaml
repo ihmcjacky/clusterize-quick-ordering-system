@@ -1,0 +1,164 @@
+# MongoDB StatefulSet for QOS Application
+# Provides persistent MongoDB database with replica set configuration
+
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mongodb
+  labels:
+    app: mongodb
+spec:
+  serviceName: mongodb-headless
+  replicas: {{ .Values.mongodb.statefulset.replicas }}
+  selector:
+    matchLabels:
+      app: mongodb
+  template:
+    metadata:
+      labels:
+        app: mongodb
+    spec:
+      # Security context
+      securityContext:
+        fsGroup: 999
+        runAsUser: 999
+        runAsNonRoot: true
+      
+      # Volumes mount from config map (mongodb-config.yaml)
+      volumes:
+      - name: mongodb-config
+        configMap:
+          name: mongodb-config
+          defaultMode: 0755
+      - name: mongodb-init-scripts
+        emptyDir: {}
+
+      # Init container to process MongoDB initialization script template
+      initContainers:
+      - name: mongodb-init-processor
+        image: alpine:3.18
+        command: ["/bin/sh"]
+        args: ["/config-templates/process-init-script.sh"]
+        securityContext:
+          runAsUser: 0
+          runAsNonRoot: false
+        env:
+        # MongoDB application user credentials from mongodb-secret
+        - name: MONGODB_APP_USER
+          valueFrom:
+            secretKeyRef:
+              name: qos-mongodb-secret
+              key: MONGODB_APP_USER
+        - name: MONGODB_APP_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: qos-mongodb-secret
+              key: MONGODB_APP_PASSWORD
+        volumeMounts:
+        - name: mongodb-config
+          mountPath: /config-templates
+        - name: mongodb-init-scripts
+          mountPath: /docker-entrypoint-initdb.d
+        resources:
+          requests:
+            cpu: "10m"
+            memory: "16Mi"
+          limits:
+            cpu: "50m"
+            memory: "32Mi"
+
+      containers:
+      - name: mongodb
+        image: {{ .Values.mongodb.image.repository }}:{{ .Values.mongodb.image.tag }}
+        imagePullPolicy: {{ .Values.mongodb.image.pullPolicy }}
+        ports:
+        - containerPort: 27017
+          name: mongodb
+        env:
+        # MongoDB root credentials from existing qos-secret
+        - name: MONGO_INITDB_ROOT_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: qos-secret
+              key: DB_USER
+        - name: MONGO_INITDB_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: qos-secret
+              key: DB_DEFAULT_PWD
+        - name: MONGO_INITDB_DATABASE
+          valueFrom:
+            configMapKeyRef:
+              name: qos-cfg
+              key: DB_NAME
+        # MongoDB replica set configuration
+        - name: MONGO_REPLICA_SET_NAME
+          value: {{ .Values.mongodb.statefulset.spec.template.spec.replicaSetName | quote }}
+        
+        # Resource limits and requests
+        resources:
+{{ toYaml .Values.mongodb.resources | nindent 10 }}
+        
+        # Volume mounts
+        volumeMounts:
+        - name: mongodb-data
+          mountPath: /data/db
+        - name: mongodb-init-scripts
+          mountPath: /docker-entrypoint-initdb.d
+        - name: mongodb-config
+          mountPath: /etc/mongod.conf
+          # Mount specific file from config map
+          subPath: mongod.conf
+        - name: mongodb-config
+          mountPath: /usr/local/bin/health-check.sh
+          subPath: health-check.sh
+        - name: mongodb-config
+          mountPath: /usr/local/bin/init-replica.sh
+          subPath: init-replica.sh
+        
+        # Liveness probe
+        livenessProbe:
+          exec:
+            command:
+            - /bin/bash
+            - /usr/local/bin/health-check.sh
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+
+        # Readiness probe
+        readinessProbe:
+          exec:
+            command:
+            - /bin/bash
+            - /usr/local/bin/health-check.sh
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+
+        # Startup probe for initial setup
+        startupProbe:
+          exec:
+            command:
+            - /bin/bash
+            - /usr/local/bin/health-check.sh
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 30
+  
+  # Volume claim templates for persistent storage
+  volumeClaimTemplates:
+  - metadata:
+      name: mongodb-data
+      labels:
+        app: mongodb
+    spec:
+      accessModes:
+{{ toYaml .Values.mongodb.statefulset.volumeClaimTemplates.spec.accessModes | nindent 6 }}
+      storageClassName: {{ .Values.mongodb.statefulset.volumeClaimTemplates.spec.storageClassName }}
+      resources:
+        requests:
+          storage: {{ .Values.mongodb.statefulset.volumeClaimTemplates.spec.resources.requests.storage | quote }}

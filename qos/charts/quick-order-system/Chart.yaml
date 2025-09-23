@@ -1,0 +1,31 @@
+apiVersion: v2
+name: quick-order-system
+description: A comprehensive Helm chart for the Quick Order System (QOS) with MongoDB, frontend, and backend components
+home: https://github.com/YOUR_USERNAME/YOUR_PROJECT
+sources:
+  - https://github.com/YOUR_USERNAME/YOUR_PROJECT
+keywords:
+  - quick-order-system
+  - qos
+  - restaurant
+  - ordering
+  - mongodb
+  - loopback
+  - react
+maintainers:
+  - name: YOUR_NAME
+    email: your-email@example.com
+
+# This is an application chart
+type: application
+
+# This is the chart version. This version number should be incremented each time you make changes
+# to the chart and its templates, including the app version.
+# Versions are expected to follow Semantic Versioning (https://semver.org/)
+version: 1.0.0
+
+# This is the version number of the application being deployed. This version number should be
+# incremented each time you make changes to the application. Versions are not expected to
+# follow Semantic Versioning. They should reflect the version the application is using.
+# It is recommended to use it with quotes.
+appVersion: "YOUR_VERSION"

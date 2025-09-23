@@ -1,0 +1,125 @@
+# MongoDB Configuration ConfigMap
+# Contains MongoDB configuration files and initialization scripts
+# Note: Sensitive data like passwords are now handled via Secrets and environment variables
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mongodb-config
+  labels:
+    app: mongodb
+data:
+  # MongoDB configuration file, literal syntax
+  mongod.conf: | #yaml
+    # MongoDB configuration for Kubernetes deployment
+    storage:
+      dbPath: /data/db
+      journal:
+        enabled: true
+    systemLog:
+      destination: file
+      logAppend: true
+      path: /var/log/mongodb/mongod.log
+      logRotate: reopen
+    net:
+      port: 27017
+      bindIp: 0.0.0.0
+    processManagement:
+      timeZoneInfo: /usr/share/zoneinfo
+    security:
+      authorization: {{ if .Values.mongodb.cfgmap.security.authorization.enabled }}enabled{{ else }}disabled{{ end }}
+    replication:
+      replSetName: {{ .Values.mongodb.cfgmap.replication.replSetName | quote }}
+
+  # MongoDB initialization script template
+  # This script will be processed by the init container to substitute environment variables
+  init-mongo.js.template: |  #js
+    // MongoDB initialization script
+    // This script runs when MongoDB starts for the first time
+    // Environment variables are substituted by the init container
+
+    // Switch to the target database
+    db = db.getSiblingDB('quick-order-system-bigmenu');
+
+    // Create application user with read/write permissions
+    // Password is injected from Kubernetes Secret via environment variable
+    db.createUser({
+      user: '${MONGODB_APP_USER}',
+      pwd: '${MONGODB_APP_PASSWORD}',
+      roles: [
+        {
+          role: 'readWrite',
+          db: 'quick-order-system-bigmenu'
+        },
+        {
+          role: 'dbAdmin',
+          db: 'quick-order-system-bigmenu'
+        }
+      ]
+    });
+
+    print('MongoDB initialization completed successfully');
+
+  # Script to process the template and substitute environment variables
+  # This script runs in an init container before the main MongoDB container starts
+  process-init-script.sh: | # shell
+    #!/bin/sh
+    # Process MongoDB initialization script template
+    # Substitutes environment variables and creates the final init script
+    set -eo pipefail
+
+    echo "Installing gettext for envsubst..."
+    apk add --no-cache gettext
+
+    echo "Processing MongoDB initialization script template..."
+
+    # Substitute environment variables in the template
+    envsubst < /config-templates/init-mongo.js.template > /docker-entrypoint-initdb.d/init-mongo.js
+
+    echo "MongoDB initialization script processed successfully"
+    echo "Final script location: /docker-entrypoint-initdb.d/init-mongo.js"
+
+    # Make the script readable
+    chmod 644 /docker-entrypoint-initdb.d/init-mongo.js
+
+  # Health check script
+  health-check.sh: | # shell
+    #!/bin/bash
+    # MongoDB health check script
+    set -eo pipefail
+
+    # Check if MongoDB is responding (try without auth first, then with auth)
+    if mongosh --quiet --eval "db.adminCommand('ping')" > /dev/null 2>&1; then
+      echo "MongoDB is healthy (no auth required)"
+      exit 0
+    elif mongosh --quiet -u "$MONGO_INITDB_ROOT_USERNAME" -p "$MONGO_INITDB_ROOT_PASSWORD" --authenticationDatabase admin --eval "db.adminCommand('ping')" > /dev/null 2>&1; then
+      echo "MongoDB is healthy (authenticated)"
+      exit 0
+    else
+      echo "MongoDB health check failed"
+      exit 1
+    fi
+
+  # Replica set initialization script
+  init-replica.sh: | # shell
+    #!/bin/bash
+    # Initialize MongoDB replica set
+    set -eo pipefail
+    
+    echo "Waiting for MongoDB to be ready..."
+    until mongosh --quiet --eval "db.adminCommand('ping')" > /dev/null 2>&1; do
+      echo "Waiting for MongoDB..."
+      sleep 2
+    done
+    
+    echo "Initializing replica set..."
+    mongosh --eval "
+      rs.initiate({
+        _id: {{ .Values.mongodb.cfgmap.replication.replSetName | quote }},
+        members: [
+          { _id: 0, host: 'mongodb-0.mongodb-headless.default.svc.cluster.local:27017' }
+        ]
+      })
+    "
+    
+    echo "Replica set initialization completed"

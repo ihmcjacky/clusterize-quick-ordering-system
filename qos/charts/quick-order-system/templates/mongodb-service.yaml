@@ -1,0 +1,66 @@
+# MongoDB Services for StatefulSet and Application Connectivity
+# Includes both headless service for StatefulSet and ClusterIP for applications
+
+---
+# Headless Service for MongoDB StatefulSet
+# Required for StatefulSet to provide stable network identities
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongodb-headless
+  labels:
+    app: mongodb
+    service-type: headless
+spec:
+  type: ClusterIP
+  clusterIP: None  # This makes it a headless service
+  selector:
+    app: mongodb
+  ports:
+  - name: mongodb
+    port: 27017
+    targetPort: 27017
+    protocol: TCP
+
+---
+# Regular ClusterIP Service for Application Connectivity
+# Applications should connect to this service
+apiVersion: v1
+kind: Service
+metadata:
+  # Same name as headless service to simplify DNS resolution
+  # Accessible from loopback-app-service
+  name: mongodb
+  labels:
+    app: mongodb
+    service-type: clusterip
+spec:
+  type: ClusterIP
+  selector:
+    app: mongodb
+  ports:
+  - name: mongodb
+    port: 27017
+    targetPort: 27017
+    protocol: TCP
+---
+# NodePort Service for External Access (Optional - for debugging)
+# Uncomment if you need external access to MongoDB for debugging
+# WARNING: Only use this in development environments
+# apiVersion: v1
+# kind: Service
+# metadata:
+#   name: mongodb-nodeport
+#   labels:
+#     app: mongodb
+#     service-type: nodeport
+# spec:
+#   type: NodePort
+#   selector:
+#     app: mongodb
+#   ports:
+#   - name: mongodb
+#     port: 27017
+#     targetPort: 27017
+#     protocol: TCP
+#     nodePort: 30017  # External port for debugging

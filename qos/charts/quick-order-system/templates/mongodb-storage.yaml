@@ -1,0 +1,49 @@
+# MongoDB Storage Components for Kind Cluster
+# This file contains StorageClass and PersistentVolume configurations for MongoDB
+
+---
+# StorageClass for MongoDB (for dynamic allocation)
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: {{ .Values.mongodb.storage.storageClass.name }}
+  labels:
+    app: mongodb
+provisioner: {{ .Values.mongodb.storage.storageClass.provisioner }}
+volumeBindingMode: WaitForFirstConsumer
+reclaimPolicy: {{ .Values.mongodb.storage.storageClass.reclaimPolicy }}
+allowVolumeExpansion: {{ .Values.mongodb.storage.storageClass.allowVolumeExpansion }}
+
+{{- $scName := .Values.mongodb.storage.storageClass.name -}}
+{{- $capacity := .Values.mongodb.storage.pv.spec.capacity.storage -}}
+{{- $accessModes := .Values.mongodb.storage.pv.spec.accessModes -}}
+{{- $reclaim := .Values.mongodb.storage.pv.spec.reclaimPolicy -}}
+{{- $nodeValues := .Values.mongodb.storage.pv.spec.nodeAffinity.values -}}
+{{- range $i, $path := .Values.mongodb.storage.pv.spec.localPaths }}
+---
+# PersistentVolume {{ $i }} for MongoDB
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: mongodb-pv-{{ $i }}
+  labels:
+    app: mongodb
+    instance: mongodb-{{ $i }}
+spec:
+  capacity:
+    storage: {{ $capacity | quote }}
+  accessModes:
+{{ toYaml $accessModes | nindent 4 }}
+  persistentVolumeReclaimPolicy: {{ $reclaim }}
+  storageClassName: {{ $scName }}
+  local:
+    path: {{ $path }}
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+{{ toYaml $nodeValues | nindent 12 }}
+{{- end }}

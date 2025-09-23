@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: qos-frontend-depl
+  name: qos-frontend-depl
+spec:
+  replicas: {{ index .Values "qos-frontend" "depl" "spec" "replicas" }}
+  # matchLabels must match the labels in the template
+  selector:
+    matchLabels:
+      app: qos-frontend-pod
+  template:
+    # labels for the pod
+    metadata:
+      labels:
+        app: qos-frontend-pod
+    spec:
+      containers:
+      - image: {{ index .Values "qos-frontend" "depl" "template" "spec" "containers" "image" }}
+        name: quick-ordering-frontend
+        ports:
+        # informational, no actual usage, for internal k8s service discovery
+        - containerPort: 80
+          name: http
+          protocol: TCP
+        envFrom:
+        - configMapRef:
+            name: qos-cfg
+        - secretRef:
+            name: qos-secret
+        # Resource control to prevent OOM
+        resources:
+          requests:
+            # 10% of 1 CPU
+            cpu: {{ index .Values "qos-frontend" "depl" "template" "spec" "containers" "resources" "requests" "cpu" }}
+            # 64MB of memory
+            memory: {{ index .Values "qos-frontend" "depl" "template" "spec" "containers" "resources" "requests" "memory" }}
+          limits:
+            cpu: {{ index .Values "qos-frontend" "depl" "template" "spec" "containers" "resources" "limits" "cpu" }}
+            memory: {{ index .Values "qos-frontend" "depl" "template" "spec" "containers" "resources" "limits" "memory" }}

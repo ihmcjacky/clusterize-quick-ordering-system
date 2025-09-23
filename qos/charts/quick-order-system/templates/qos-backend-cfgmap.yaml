@@ -1,0 +1,39 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: qos-backend-cfg
+  labels:
+    app: qos-backend-cfg
+data: 
+  # MongoDB Configuration for LoopbackJS
+  datasources.json.template: | #json
+    {
+      "db": {
+        "name": "db",
+        "connector": "memory"
+      },
+      "quick-order-system": {
+        "host": "${DB_HOST}",
+        "port": ${DB_PORT},
+        "database": "${DB_NAME}",
+        "password": "${DB_DEFAULT_PWD}",
+        "name": "quick-order-system",
+        "user": "${DB_USER}",
+        "connector": "mongodb",
+        "allowExtendedOperators": true
+      },
+      "mealImages": {
+        "name": "mealImages",
+        "connector": "loopback-component-storage",
+        "provider": "filesystem",
+        "root": "./assets/images",
+        "nameConflict": "makeUnique",
+        "maxFileSize": "5242880",
+        "allowedContentTypes": [
+          "image/jpeg",
+          "image/png",
+          "image/gif",
+          "image/webp"
+        ]
+      }
+    }

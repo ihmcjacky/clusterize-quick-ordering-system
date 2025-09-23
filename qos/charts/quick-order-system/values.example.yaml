@@ -1,0 +1,505 @@
+# Quick Order System Helm Chart Values
+# This file contains all configurable parameters for the QOS deployment
+
+# Global configuration
+global:
+  # Namespace for the deployment
+  namespace: default
+  # Environment (development, staging, production)
+  environment: production
+
+# Application Configuration
+application:
+  # Application name and branding
+  name: YOUR_APP_NAME
+  # Domain configurations
+  domains:
+    api:
+      prod: api.your-domain.com
+      dev: api.localhost
+    frontend:
+      prod: your-domain.com
+      dev: localhost
+  # Protocol settings
+  protocol: SECURE
+  # Node.js environment
+  nodeEnv: production
+  # Public URL path
+  publicUrl: /
+
+# Database Configuration
+database:
+  # Database name
+  name: quick-order-system-bigmenu
+  # MongoDB connection settings
+  host: mongodb.default.svc.cluster.local
+  port: 27017
+  # Authentication source
+  authSource: admin
+  # Connection URL (constructed from above values)
+  url: mongodb://mongodb.default.svc.cluster.local:27017/quick-order-system-bigmenu
+
+# MongoDB Configuration
+mongodb:
+  # MongoDB image configuration
+  image:
+    repository: mongo
+    tag: "7.0"
+    pullPolicy: IfNotPresent
+
+  # ConfigMap settings
+  cfgmap:
+    security:
+      authorization:
+        enabled: true
+    replication:
+      replSetName: rs0
+
+  # StatefulSet configuration
+  statefulset:
+    # Number of MongoDB replicas
+    replicas: 1
+    spec:
+      template:
+        spec:
+          replicaSetName: rs0
+    # Volume claim templates
+    volumeClaimTemplates:
+      spec:
+        resources:
+          requests:
+            storage: 10Gi
+        storageClassName: mongodb-storage
+        accessModes:
+          - ReadWriteOnce
+
+  # Storage configuration
+  storage:
+    # StorageClass settings
+    storageClass:
+      name: mongodb-storage
+      provisioner: rancher.io/local-path
+      reclaimPolicy: Retain
+      allowVolumeExpansion: true
+    # PersistentVolume settings
+    pv:
+      spec:
+        capacity:
+          storage: 10Gi
+        accessModes:
+          - ReadWriteOnce
+        reclaimPolicy: Retain
+        # Local storage paths for Kind cluster
+        localPaths:
+          - /tmp/mongodb-data-0
+          - /tmp/mongodb-data-1
+        # Node affinity for Kind cluster
+        nodeAffinity:
+          values:
+            - qos-worker
+            - qos-worker2
+
+  # Resource limits and requests
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "512Mi"
+    limits:
+      cpu: "500m"
+      memory: "1Gi"
+
+  # Service configuration
+  service:
+    # Headless service for StatefulSet
+    headless:
+      name: mongodb-headless
+      port: 27017
+    # ClusterIP service for applications
+    clusterip:
+      name: mongodb
+      port: 27017
+    # Optional NodePort for debugging (disabled by default)
+    nodeport:
+      enabled: false
+      port: 27017
+      nodePort: 30017
+
+# QOS Frontend Configuration
+qos-frontend:
+  # Deployment settings
+  depl:
+    spec:
+      replicas: 2
+    template:
+      spec:
+        containers:
+          image: registry.gitlab.com/YOUR_USERNAME/YOUR_PROJECT/frontend:YOUR_TAG
+          pullPolicy: IfNotPresent
+          # Container port
+          port: 80
+          # Resource limits and requests
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "64Mi"
+            limits:
+              cpu: "200m"
+              memory: "128Mi"
+
+  # Service configuration
+  service:
+    # NodePort service
+    nodeport:
+      name: qos-front-svc
+      type: NodePort
+      ports:
+        http:
+          port: 80
+          targetPort: 80
+        https:
+          port: 443
+          targetPort: 443
+    # ClusterIP service for ingress
+    clusterip:
+      name: qos-front-cip-svc
+      type: ClusterIP
+      port: 80
+      targetPort: 80
+# QOS Backend Configuration
+qos-backend:
+  # Deployment settings
+  depl:
+    spec:
+      replicas: 2
+    template:
+      spec:
+        containers:
+          image: registry.gitlab.com/YOUR_USERNAME/YOUR_PROJECT/backend:YOUR_TAG
+          pullPolicy: IfNotPresent
+          # Container port
+          port: 3002
+          # Resource limits and requests
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "64Mi"
+            limits:
+              cpu: "200m"
+              memory: "128Mi"
+
+  # Service configuration
+  service:
+    name: loopback
+    type: ClusterIP
+    port: 3002
+    targetPort: 3002
+
+  # ConfigMap for datasources template
+  configmap:
+    name: qos-backend-cfg
+    # LoopbackJS datasources configuration
+    datasources:
+      # Memory connector for testing
+      db:
+        name: db
+        connector: memory
+      # MongoDB connector for production
+      mongodb:
+        name: quick-order-system
+        connector: mongodb
+        allowExtendedOperators: true
+      # File storage connector for meal images
+      mealImages:
+        name: mealImages
+        connector: loopback-component-storage
+        provider: filesystem
+        root: ./assets/images
+        nameConflict: makeUnique
+        maxFileSize: 5242880
+        allowedContentTypes:
+          - image/jpeg
+          - image/png
+          - image/gif
+          - image/webp
+
+# Port Configuration
+ports:
+  # Development ports
+  dev:
+    frontend: 30010
+    backend: 3002
+    loadBalancer: 3002
+  # Cloud development ports
+  cloud:
+    dev:
+      frontend: 4001
+      server: 4002
+    prod:
+      frontend: 4001
+      server: 80
+
+# URL Configuration
+urls:
+  # Development URLs
+  dev:
+    url: YOUR_DEV_IP_OR_DOMAIN
+    port: 30010
+  # Production URLs
+  prod:
+    url: localhost
+    domain: your-domain.com
+
+# Ingress Configuration
+ingress:
+  # Frontend ingress
+  frontend:
+    enabled: true
+    name: qos-front-ingress
+    className: nginx
+    # Host configuration
+    host: localhost
+    # TLS configuration
+    tls:
+      enabled: true
+      secretName: qos-frontend-tls-secret
+      hosts:
+        - localhost
+    # Path configuration
+    paths:
+      - path: /
+        pathType: Prefix
+        service:
+          name: qos-front-cip-svc
+          port: 80
+
+# TLS/SSL Configuration
+tls:
+  # Frontend TLS secret
+  frontend:
+    secretName: qos-frontend-tls-secret
+    # Whether to manage the TLS secret via Helm (false = create externally)
+    manageSecret: false
+    # Certificate and key paths (for reference)
+    certPath: /usr/app/certificates/cert.pem
+    keyPath: /usr/app/certificates/key.pem
+    # Base64-encoded certificate and key (only used if manageSecret: true)
+    # For production, leave these empty and create secret externally
+    crt: ""
+    key: ""
+
+# Secrets Configuration
+secrets:
+  # Main application secret
+  qos:
+    name: qos-secret
+    # Database credentials (base64 encoded in actual secret)
+    database:
+      user: USERNAME
+      password: PASSWORD
+    # Docker registry
+    dockerRegistry: DOCKER_REGISTRY
+    # Certificate paths
+    cert: /usr/app/certificates/cert.pem
+    privateKey: /usr/app/certificates/key.pem
+    # User credentials
+    user: USERNAME
+
+  gitlab:
+    name: qos-gitlab-regcred
+    server: registry.gitlab.com
+    username: ""
+    password: ""
+  mongodb:
+    app:
+      user: APP_DB_USER
+      password: APP_DB_PASSWORD
+
+# ConfigMap Configuration
+configmaps:
+  # Main application configuration
+  qos:
+    name: qos-cfg
+    # Application environment variables
+    data:
+      API_PROD_DOMAIN: api.your-domain.com
+      AUTH_SRC: admin
+      CLNT_ORDERING: enabled
+      CLOUD_DEV_FRONTEND_PORT: "4001"
+      CLOUD_DEV_SERVER_PORT: "4002"
+      CLOUD_PROD_FRONTEND_PORT: "4001"
+      CLOUD_PROD_SERVER_PORT: "80"
+      DB_NAME: quick-order-system-bigmenu
+      DEV_PORT: "30010"
+      DEV_URL: YOUR_DEV_IP_OR_DOMAIN
+      LB_DEV_PORT: "3002"
+      NODE_ENV: production
+      PROD_DOMAIN: your-domain.com
+      PROD_URL: localhost
+      PUBLIC_URL: /
+      REACT_APP_APPNAME: YOUR_APP_NAME
+      REACT_APP_PROD_DOMAIN: api.your-domain.com
+      REACT_APP_PROTO: SECURE
+      # MongoDB Configuration for LoopbackJS
+      DB_HOST: mongodb.default.svc.cluster.local
+      DB_PORT: "27017"
+      MONGODB_URL: mongodb://mongodb.default.svc.cluster.local:27017/quick-order-system-bigmenu
+
+# Image Pull Secrets Configuration
+imagePullSecrets:
+  # GitLab registry secret
+  - name: qos-gitlab-regcred
+
+# Service Account Configuration
+serviceAccount:
+  # Default service account patches for image pull secrets
+  default:
+    imagePullSecrets:
+      - qos-gitlab-regcred
+
+# Security Configuration
+security:
+  # Pod security context
+  podSecurityContext:
+    fsGroup: 999
+    runAsUser: 999
+    runAsNonRoot: true
+
+  # Container security context
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: false
+    runAsNonRoot: true
+    capabilities:
+      drop:
+        - ALL
+
+# Health Checks Configuration
+healthChecks:
+  # MongoDB health checks
+  mongodb:
+    livenessProbe:
+      exec:
+        command:
+          - /bin/bash
+          - /usr/local/bin/health-check.sh
+      initialDelaySeconds: 30
+      periodSeconds: 10
+      timeoutSeconds: 5
+      failureThreshold: 3
+    readinessProbe:
+      exec:
+        command:
+          - /bin/bash
+          - /usr/local/bin/health-check.sh
+      initialDelaySeconds: 10
+      periodSeconds: 5
+      timeoutSeconds: 3
+      failureThreshold: 3
+    startupProbe:
+      exec:
+        command:
+          - /bin/bash
+          - /usr/local/bin/health-check.sh
+      initialDelaySeconds: 10
+      periodSeconds: 10
+      timeoutSeconds: 5
+      failureThreshold: 30
+
+# Autoscaling Configuration (disabled by default)
+autoscaling:
+  # Frontend autoscaling
+  frontend:
+    enabled: false
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 80
+    targetMemoryUtilizationPercentage: 80
+
+  # Backend autoscaling
+  backend:
+    enabled: false
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 80
+    targetMemoryUtilizationPercentage: 80
+
+# Node Selector and Affinity
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+# Additional Labels and Annotations
+labels:
+  # Common labels applied to all resources
+  common:
+    app.kubernetes.io/name: quick-order-system
+    app.kubernetes.io/instance: qos
+    app.kubernetes.io/version: YOUR_VERSION
+    app.kubernetes.io/component: web-application
+    app.kubernetes.io/part-of: quick-order-system
+    app.kubernetes.io/managed-by: Helm
+
+annotations:
+  # Common annotations
+  common: {}
+
+# Volume Configuration
+volumes:
+  # MongoDB configuration volume
+  mongodbConfig:
+    name: mongodb-config
+    configMap:
+      name: mongodb-config
+      defaultMode: 0755
+
+  # Backend configuration volume
+  backendConfig:
+    name: qos-backend-cfg
+    configMap:
+      name: qos-backend-cfg
+      defaultMode: 0755
+
+  # Empty directories for temporary storage
+  emptyDirs:
+    - name: mongodb-init-scripts
+    - name: meal-images-assets
+    - name: qos-backend-datasources-json
+
+# Environment-specific Overrides
+# These can be overridden in separate values files for different environments
+environments:
+  development:
+    # Override values for development
+    mongodb:
+      cfgmap:
+        security:
+          authorization:
+            enabled: false
+    application:
+      nodeEnv: development
+    database:
+      name: quick-order-system-dev
+
+  staging:
+    # Override values for staging
+    application:
+      nodeEnv: staging
+    database:
+      name: quick-order-system-staging
+
+  production:
+    # Production values (default)
+    mongodb:
+      cfgmap:
+        security:
+          authorization:
+            enabled: true
+    application:
+      nodeEnv: production
+    server: registry.gitlab.com
+    # Credentials (should be updated with actual values)
+    username: k8s
+    # Password should be updated with actual GitLab token
+    password: GITLAB_TOKEN

@@ -1,0 +1,49 @@
+# gitlab CI/CD token
+**/context.ini
+
+# k8s secrets
+**/*secret*
+
+# include secret sample files
+!**/*sample*
+
+# all kinds of certificates
+*.crt
+*.pem
+*.key
+
+# specific files
+qos-cfgmap-from-env.yaml
+
+# Sensitive values files (commit only the *.example.yaml variants)
+qos/charts/quick-order-system/values.yaml
+qos/charts/quick-order-system/values-development.yaml
+qos/charts/quick-order-system/values-production.yaml
+!qos/charts/quick-order-system/values.example.yaml
+!qos/charts/quick-order-system/values-development.example.yaml
+!qos/charts/quick-order-system/values-production.example.yaml
+
+# Local secrets env (commit only the example)
+qos/configs/secrets.env
+!qos/configs/secrets.example.env
+
+# Local deployment script (commit only the example)
+qos-depl.sh
+!qos-depl.example.sh
+
+# Private TLS materials (commit only *.sample)
+qos/certificates/cert.pem
+qos/certificates/key.pem
+!qos/certificates/*.sample
+
+# Case study with real creds (commit only the example)
+bug-fixing-case-studies/supreme-av-container-startup-ordering-issues/src/docker-compose.yml
+!bug-fixing-case-studies/supreme-av-container-startup-ordering-issues/src/docker-compose.example.yml
+
+# Config files with sensitive data (commit only examples)
+qos/configs/config.env
+!qos/configs/config.example.env
+
+# Certificate documentation with real domains (commit only example)
+qos/certificates/README.md
+!qos/certificates/README.example.md

@@ -1,0 +1,219 @@
+# Production Environment Values for Quick Order System
+# Override default values for production deployment
+
+# Global configuration
+global:
+  environment: production
+
+# Application configuration for production
+application:
+  nodeEnv: production
+  # Production domains
+  domains:
+    api:
+      prod: api.your-domain.com
+    frontend:
+      prod: your-domain.com
+  # Secure protocol for production
+  protocol: SECURE
+
+# Database configuration for production
+database:
+  name: quick-order-system-prod
+  # Use production MongoDB service
+  host: mongodb.default.svc.cluster.local
+  port: "27017"
+  url: mongodb://mongodb.default.svc.cluster.local:27017/quick-order-system-prod
+
+# MongoDB configuration for production
+mongodb:
+  # Enable authentication for production security
+  cfgmap:
+    security:
+      authorization:
+        enabled: true
+    replication:
+      replSetName: rs0-prod
+
+  # Production-grade resources
+  resources:
+    requests:
+      cpu: "200m"
+      memory: "1Gi"
+    limits:
+      cpu: "1000m"
+      memory: "2Gi"
+
+  # Larger storage for production
+  statefulset:
+    replicas: 1  # Can be increased for HA
+    volumeClaimTemplates:
+      spec:
+        resources:
+          requests:
+            storage: 20Gi
+
+  storage:
+    pv:
+      spec:
+        capacity:
+          storage: 20Gi
+
+# QOS Frontend configuration for production
+qos-frontend:
+  depl:
+    spec:
+      replicas: 3  # Multiple replicas for high availability
+    template:
+      spec:
+        containers:
+          # Use production image tag
+          image: registry.gitlab.com/YOUR_USERNAME/YOUR_PROJECT/frontend:YOUR_TAG
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+
+# QOS Backend configuration for production
+qos-backend:
+  depl:
+    spec:
+      replicas: 3  # Multiple replicas for high availability
+    template:
+      spec:
+        containers:
+          # Use production image tag
+          image: registry.gitlab.com/YOUR_USERNAME/YOUR_PROJECT/backend:YOUR_TAG
+          resources:
+            requests:
+              cpu: "150m"
+              memory: "256Mi"
+            limits:
+              cpu: "750m"
+              memory: "512Mi"
+
+# Production URLs
+urls:
+  dev:
+    url: YOUR_DEV_IP_OR_DOMAIN
+  prod:
+    url: your-domain.com
+    domain: your-domain.com
+
+# Production ports
+ports:
+  dev:
+    frontend: "30010"
+    loadBalancer: "3002"
+  cloud:
+    dev:
+      frontend: "4001"
+      server: "4002"
+    prod:
+      frontend: "4001"
+      server: "80"
+
+# Ingress configuration for production
+ingress:
+  frontend:
+    enabled: true
+    name: qos-front-ingress-prod
+    className: nginx
+    host: your-domain.com
+    tls:
+      enabled: true  # Enable TLS for production
+      secretName: qos-frontend-tls-secret-prod
+      hosts:
+        - your-domain.com
+
+# TLS configuration for production
+tls:
+  frontend:
+    secretName: qos-frontend-tls-secret-prod
+    manageSecret: false  # Create TLS secret externally for production
+    certPath: /usr/app/certificates/cert.pem
+    keyPath: /usr/app/certificates/key.pem
+    # Leave crt/key empty - create secret externally with real certificates
+    crt: ""
+    key: ""
+
+# Production secrets (use secure values)
+secrets:
+  qos:
+    name: qos-secret-prod
+    database:
+      user: root
+      password: "PASSWORD"  # Set via --set or external secret management
+    dockerRegistry: DOCKER_REGISTRY
+    cert: /usr/app/certificates/cert.pem
+    privateKey: /usr/app/certificates/key.pem
+    user: root
+
+  gitlab:
+    name: qos-gitlab-regcred-prod
+    server: registry.gitlab.com
+    username: ""  # Set via --set or external secret
+    password: "PASSWORD"  # Set via --set or external secret
+
+  mongodb:
+    app:
+      user: APP_DB_USER
+      password: "PASSWORD"  # Set via --set or external secret management
+
+# ConfigMaps configuration for production
+configmaps:
+  qos:
+    name: qos-cfg-prod
+
+# Production-specific environment variables
+environment:
+  variables:
+    NODE_ENV: production
+    DEBUG: "false"
+    LOG_LEVEL: info
+
+# Production security settings
+security:
+  # Pod security context
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    fsGroup: 2000
+
+  # Container security context
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    runAsNonRoot: true
+    runAsUser: 1000
+    capabilities:
+      drop:
+        - ALL
+
+# Production monitoring and health checks
+monitoring:
+  enabled: true
+  # Prometheus annotations
+  prometheus:
+    scrape: true
+    port: "3000"
+    path: "/metrics"
+
+# Production autoscaling (if HPA is configured)
+autoscaling:
+  frontend:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+  
+  backend:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 8
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80

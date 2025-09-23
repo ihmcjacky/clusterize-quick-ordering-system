@@ -1,0 +1,47 @@
+🎉 Quick Order System has been deployed successfully!
+
+📋 Deployment Summary:
+- Release Name: {{ .Release.Name }}
+- Namespace: {{ .Release.Namespace }}
+- Chart Version: {{ .Chart.Version }}
+- App Version: {{ .Chart.AppVersion }}
+
+🔍 Check deployment status:
+  kubectl get pods -n {{ .Release.Namespace }}
+  kubectl get services -n {{ .Release.Namespace }}
+  kubectl get ingress -n {{ .Release.Namespace }}
+
+🌐 Access the application:
+{{- if index .Values "ingress" "frontend" "enabled" }}
+  Frontend URL: https://{{ index .Values "ingress" "frontend" "host" }}
+{{- else }}
+  # Get the frontend NodePort service
+  export NODE_PORT=$(kubectl get --namespace {{ .Release.Namespace }} -o jsonpath="{.spec.ports[0].nodePort}" services qos-front-svc)
+  export NODE_IP=$(kubectl get nodes --namespace {{ .Release.Namespace }} -o jsonpath="{.items[0].status.addresses[0].address}")
+  echo "Frontend: http://$NODE_IP:$NODE_PORT"
+{{- end }}
+
+🗄️ MongoDB Connection:
+  # Connect to MongoDB from within the cluster
+  kubectl exec -it -n {{ .Release.Namespace }} mongodb-0 -- mongosh
+
+📊 Monitor the application:
+  # Watch pods
+  kubectl get pods -n {{ .Release.Namespace }} -w
+
+  # Check logs
+  kubectl logs -f -n {{ .Release.Namespace }} -l app=qos-frontend-pod
+  kubectl logs -f -n {{ .Release.Namespace }} -l app=qos-backend-pod
+  kubectl logs -f -n {{ .Release.Namespace }} -l app=mongodb
+
+🔧 Useful commands:
+  # Scale frontend
+  helm upgrade {{ .Release.Name }} . --set qos-frontend.depl.spec.replicas=3 -n {{ .Release.Namespace }}
+
+  # Update image
+  helm upgrade {{ .Release.Name }} . --set qos-frontend.depl.template.spec.containers.image=new-image:tag -n {{ .Release.Namespace }}
+
+  # Uninstall
+  helm uninstall {{ .Release.Name }} -n {{ .Release.Namespace }}
+
+For more information, visit: https://github.com/YOUR_USERNAME/YOUR_PROJECT
