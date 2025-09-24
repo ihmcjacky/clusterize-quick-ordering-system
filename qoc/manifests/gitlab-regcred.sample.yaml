@@ -1,0 +1,14 @@
+apiVersion: v1
+data:
+  .dockerconfigjson: BASE64_ENCODED_DOCKER_CONFIG_JSON
+kind: Secret
+metadata:
+  creationTimestamp: null
+  name: qoc-gitlab-regrcd
+type: kubernetes.io/dockerconfigjson
+
+# Instructions:
+# 1. Replace BASE64_ENCODED_DOCKER_CONFIG_JSON with your actual base64-encoded Docker config
+# 2. To generate the base64 string, use:
+#    echo '{"auths":{"registry.gitlab.com":{"username":"YOUR_USERNAME","password":"YOUR_GITLAB_TOKEN","auth":"BASE64_OF_USERNAME:TOKEN"}}}' | base64 -w 0
+# 3. The auth field should be: echo -n "YOUR_USERNAME:YOUR_GITLAB_TOKEN" | base64 -w 0

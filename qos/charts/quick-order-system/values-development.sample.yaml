@@ -1,0 +1,174 @@
+# Development Environment Values for Quick Order System
+# Override default values for development deployment
+
+# Global configuration
+global:
+  environment: development
+
+# Application configuration for development
+application:
+  nodeEnv: development
+  # Development domains
+  domains:
+    api:
+      prod: api.dev.localhost
+    frontend:
+      prod: dev.localhost
+  # Development protocol (non-secure for local testing)
+  protocol: INSECURE
+
+# Database configuration for development
+database:
+  name: quick-order-system-dev
+  # Use local MongoDB service
+  host: mongodb.default.svc.cluster.local
+  port: "27017"
+  url: mongodb://mongodb.default.svc.cluster.local:27017/quick-order-system-dev
+
+# MongoDB configuration for development
+mongodb:
+  # Disable authentication for easier development
+  cfgmap:
+    security:
+      authorization:
+        enabled: false
+    replication:
+      replSetName: rs0-dev
+
+  # Reduced resources for development
+  resources:
+    requests:
+      cpu: "50m"
+      memory: "256Mi"
+    limits:
+      cpu: "200m"
+      memory: "512Mi"
+
+  # Smaller storage for development
+  statefulset:
+    replicas: 1
+    volumeClaimTemplates:
+      spec:
+        resources:
+          requests:
+            storage: 5Gi
+
+  storage:
+    pv:
+      spec:
+        capacity:
+          storage: 5Gi
+
+# QOS Frontend configuration for development
+qos-frontend:
+  depl:
+    spec:
+      replicas: 1  # Single replica for development
+    template:
+      spec:
+        containers:
+          # Use development image tag
+          image: registry.gitlab.com/maxwellhk/quick-ordering-system/quick-ordering-frontend-k8s:dev
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "200m"
+              memory: "128Mi"
+
+# QOS Backend configuration for development
+qos-backend:
+  depl:
+    spec:
+      replicas: 1  # Single replica for development
+    template:
+      spec:
+        containers:
+          # Use development image tag
+          image: registry.gitlab.com/maxwellhk/quick-ordering-system/quick-ordering-backend-k8s:dev
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "128Mi"
+            limits:
+              cpu: "200m"
+              memory: "256Mi"
+
+# Development URLs
+urls:
+  dev:
+    url: 192.168.1.219
+  prod:
+    url: dev.localhost
+    domain: dev.localhost
+
+# Development ports
+ports:
+  dev:
+    frontend: "30010"
+    loadBalancer: "3002"
+  cloud:
+    dev:
+      frontend: "4001"
+      server: "4002"
+    prod:
+      frontend: "4001"
+      server: "80"
+
+# Ingress configuration for development
+ingress:
+  frontend:
+    enabled: true
+    name: qos-front-ingress-dev
+    className: nginx
+    host: dev.localhost
+    tls:
+      enabled: false  # Disable TLS for development
+      secretName: qos-frontend-tls-secret-dev
+      hosts:
+        - dev.localhost
+
+# TLS configuration for development
+tls:
+  frontend:
+    secretName: qos-frontend-tls-secret-dev
+    manageSecret: false  # Don't manage TLS in development
+    crt: ""
+    key: ""
+
+# Development secrets (use default/simple values)
+secrets:
+  qos:
+    name: qos-secret-dev
+    database:
+      user: YOUR_DB_USER
+      password: YOUR_DB_PASSWORD
+    dockerRegistry: YOUR_DOCKER_REGISTRY_URL
+    cert: /usr/app/certificates/cert.pem
+    privateKey: /usr/app/certificates/key.pem
+    user: YOUR_USER
+
+  gitlab:
+    name: qos-gitlab-regcred-dev
+    server: registry.gitlab.com
+    username: ""  # Set via --set or external secret
+    password: ""  # Set via --set or external secret
+
+  mongodb:
+    app:
+      user: YOUR_MONGODB_USER
+      password: YOUR_MONGODB_PASSWORD
+
+# ConfigMaps configuration for development
+configmaps:
+  qos:
+    name: qos-cfg-dev
+
+# Development-specific environment variables
+# These override the default values for development
+environment:
+  variables:
+    NODE_ENV: development
+    DEBUG: "true"
+    LOG_LEVEL: debug
